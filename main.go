@@ -15,6 +15,7 @@ const (
 )
 
 func main() {
+	showAll := flag.Bool("all", false, "show hidden files and directories")
 	maxDepth := flag.Int("depth", 2, "maximum directory depth")
 	path := flag.String("path", "./", "path")
 	flag.Parse()
@@ -28,13 +29,13 @@ func main() {
 	}
 
 	fmt.Println(filepath.Clean(*path))
-	err := printDir(*path, 0, "", *maxDepth)
+	err := printDir(*path, 0, "", *maxDepth, *showAll)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func printDir(path string, depth int, prefix string, maxDepth int) error {
+func printDir(path string, depth int, prefix string, maxDepth int, showAll bool) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return err
@@ -43,7 +44,7 @@ func printDir(path string, depth int, prefix string, maxDepth int) error {
 	var visible []os.DirEntry
 
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".") {
+		if !showAll && strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
 
@@ -60,7 +61,7 @@ func printDir(path string, depth int, prefix string, maxDepth int) error {
 		} else {
 			fmt.Print(LastLine)
 		}
-		
+
 		if e.IsDir() {
 			fmt.Printf("%v/\n", e.Name())
 			if depth < maxDepth {
@@ -72,7 +73,7 @@ func printDir(path string, depth int, prefix string, maxDepth int) error {
 					childPrefix += "│   "
 				}
 
-				if err := printDir(childPath, depth+1, childPrefix, maxDepth); err != nil {
+				if err := printDir(childPath, depth+1, childPrefix, maxDepth, showAll); err != nil {
 					return err
 				}
 			}
