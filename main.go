@@ -15,9 +15,16 @@ const (
 	Line     = "├──"
 )
 
+type options struct {
+	maxDepth int
+	showAll bool
+	dirsFirst bool
+	excluded map[string]bool
+}
+
 func main() {
 	dirsFirst := flag.Bool("dirs-first", false, "shows the directories first")
-	exclude := flag.String("exclude", "", "exclude files and directories")
+	excluded := flag.String("exclude", "", "exclude files and directories")
 	showAll := flag.Bool("all", false, "show hidden files and directories")
 	maxDepth := flag.Int("depth", 2, "maximum directory depth")
 	path := flag.String("path", "./", "path")
@@ -25,7 +32,7 @@ func main() {
 
 	names := make(map[string]bool)
 
-	for _, name := range strings.Split(*exclude, ",") {
+	for _, name := range strings.Split(*excluded, ",") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
@@ -41,18 +48,21 @@ func main() {
 		log.Fatal("unexpected arguments; use -path to specify a directory")
 	}
 
+	opts := options{
+		maxDepth: *maxDepth,
+		showAll: *showAll,
+		dirsFirst: *dirsFirst,
+		excluded: names,
+	}
+
 	fmt.Println(filepath.Clean(*path))
-	err := printDir(*path, 0, "", *maxDepth, *showAll, names, *dirsFirst)
+	err := printDir(*path, 0, "", opts)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func printDir(
-	path string, depth int,
-	prefix string, maxDepth int,
-	showAll bool, names map[string]bool,
-	dirsFirst bool) error {
+func printDir(path string, depth int, prefix string, opts options) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return fmt.Errorf("read directory %q: %w", path, err)
@@ -61,17 +71,17 @@ func printDir(
 	var visible []os.DirEntry
 
 	for _, e := range entries {
-		if !showAll && strings.HasPrefix(e.Name(), ".") {
+		if !opts.showAll && strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		if names[e.Name()] {
+		if opts.excluded[e.Name()] {
 			continue
 		}
 
 		visible = append(visible, e)
 	}
 
-	if dirsFirst {
+	if opts.dirsFirst {
 		sort.SliceStable(visible, func(i, j int) bool {
 			return visible[i].IsDir() && !visible[j].IsDir()
 		})
@@ -90,7 +100,7 @@ func printDir(
 
 		if e.IsDir() {
 			fmt.Printf("%v/\n", e.Name())
-			if depth < maxDepth {
+			if depth < opts.maxDepth {
 				childPrefix := prefix
 
 				if isLast {
@@ -99,10 +109,7 @@ func printDir(
 					childPrefix += "│   "
 				}
 
-				if err := printDir(childPath, depth+1,
-					childPrefix, maxDepth,
-					showAll, names,
-					dirsFirst); err != nil {
+				if err := printDir(childPath, depth+1,childPrefix, opts); err != nil {
 					log.Printf("warning: %v", err)
 				}
 			}
