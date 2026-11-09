@@ -4,36 +4,54 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"path/filepath"
 )
 
+const LastLine = "└──"
+const Line = "├──"
+const maxDepth = 2
+
 func main() {
-	err := printDir("./", 0)
+	err := printDir("./", 0, "")
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func printDir(path string, depth int) error {
+func printDir(path string, depth int, prefix string) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return err
 	}
 
-	for _, e := range entries {
-		indent := strings.Repeat(" ", depth)
+	for i, e := range entries {
+		isLast := i == len(entries)-1
 		childPath := filepath.Join(path, e.Name())
 
-		if e.IsDir(){
-			fmt.Printf("%v[D] %v\n", indent, e.Name())
-			if depth < 1	{
-				if err := printDir(childPath, depth + 1); err != nil {
+		fmt.Print(prefix)
+		if !isLast {
+			fmt.Print(Line)
+		} else {
+			fmt.Print(LastLine)
+		}
+		// TODO: ignore .* files
+		if e.IsDir() {
+			fmt.Printf("%v/\n", e.Name())
+			if depth < maxDepth {
+				childPrefix := prefix
+
+				if isLast {
+					childPrefix += "	"
+				} else {
+					childPrefix += "│   "
+				}
+
+				if err := printDir(childPath, depth+1, childPrefix); err != nil {
 					return err
 				}
 			}
 		} else {
-			fmt.Printf("%v[F] %v\n", indent, e.Name())
+			fmt.Printf("%v\n", e.Name())
 		}
 	}
 
