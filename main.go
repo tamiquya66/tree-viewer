@@ -1,20 +1,22 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"flag"
+	"sort"
 	"strings"
 )
 
 const (
 	LastLine = "└──"
-	Line = "├──"
+	Line     = "├──"
 )
 
 func main() {
+	dirsFirst := flag.Bool("dirs-first", false, "shows the directories first")
 	exclude := flag.String("exclude", "", "exclude files and directories")
 	showAll := flag.Bool("all", false, "show hidden files and directories")
 	maxDepth := flag.Int("depth", 2, "maximum directory depth")
@@ -40,16 +42,20 @@ func main() {
 	}
 
 	fmt.Println(filepath.Clean(*path))
-	err := printDir(*path, 0, "", *maxDepth, *showAll, names)
+	err := printDir(*path, 0, "", *maxDepth, *showAll, names, *dirsFirst)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func printDir(path string, depth int, prefix string, maxDepth int, showAll bool, names map[string]bool) error {
+func printDir(
+	path string, depth int,
+	prefix string, maxDepth int,
+	showAll bool, names map[string]bool,
+	dirsFirst bool) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("read directory %q: %w", path, err)
 	}
 
 	var visible []os.DirEntry
@@ -63,6 +69,12 @@ func printDir(path string, depth int, prefix string, maxDepth int, showAll bool,
 		}
 
 		visible = append(visible, e)
+	}
+
+	if dirsFirst {
+		sort.SliceStable(visible, func(i, j int) bool {
+			return visible[i].IsDir() && !visible[j].IsDir()
+		})
 	}
 
 	for i, e := range visible {
@@ -87,8 +99,11 @@ func printDir(path string, depth int, prefix string, maxDepth int, showAll bool,
 					childPrefix += "│   "
 				}
 
-				if err := printDir(childPath, depth+1, childPrefix, maxDepth, showAll, names); err != nil {
-					return err
+				if err := printDir(childPath, depth+1,
+					childPrefix, maxDepth,
+					showAll, names,
+					dirsFirst); err != nil {
+					log.Printf("warning: %v", err)
 				}
 			}
 		} else {
