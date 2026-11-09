@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,10 +17,10 @@ const (
 )
 
 type options struct {
-	maxDepth int
-	showAll bool
+	maxDepth  int
+	showAll   bool
 	dirsFirst bool
-	excluded map[string]bool
+	excluded  map[string]bool
 }
 
 func main() {
@@ -49,20 +50,22 @@ func main() {
 	}
 
 	opts := options{
-		maxDepth: *maxDepth,
-		showAll: *showAll,
+		maxDepth:  *maxDepth,
+		showAll:   *showAll,
 		dirsFirst: *dirsFirst,
-		excluded: names,
+		excluded:  names,
 	}
 
-	fmt.Println(filepath.Clean(*path))
-	err := printDir(*path, 0, "", opts)
+	out := os.Stdout
+
+	fmt.Fprintln(out, filepath.Clean(*path))
+	err := printDir(out, *path, 0, "", opts)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func printDir(path string, depth int, prefix string, opts options) error {
+func printDir(out io.Writer, path string, depth int, prefix string, opts options) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return fmt.Errorf("read directory %q: %w", path, err)
@@ -91,15 +94,15 @@ func printDir(path string, depth int, prefix string, opts options) error {
 		isLast := i == len(visible)-1
 		childPath := filepath.Join(path, e.Name())
 
-		fmt.Print(prefix)
+		fmt.Fprint(out, prefix)
 		if !isLast {
-			fmt.Print(Line)
+			fmt.Fprint(out, Line)
 		} else {
-			fmt.Print(LastLine)
+			fmt.Fprint(out, LastLine)
 		}
 
 		if e.IsDir() {
-			fmt.Printf("%v/\n", e.Name())
+			fmt.Fprintf(out, "%v/\n", e.Name())
 			if depth < opts.maxDepth {
 				childPrefix := prefix
 
@@ -109,12 +112,12 @@ func printDir(path string, depth int, prefix string, opts options) error {
 					childPrefix += "│   "
 				}
 
-				if err := printDir(childPath, depth+1,childPrefix, opts); err != nil {
+				if err := printDir(out, childPath, depth+1, childPrefix, opts); err != nil {
 					log.Printf("warning: %v", err)
 				}
 			}
 		} else {
-			fmt.Printf("%v\n", e.Name())
+			fmt.Fprintf(out, "%v\n", e.Name())
 		}
 	}
 
